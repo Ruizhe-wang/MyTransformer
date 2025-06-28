@@ -58,3 +58,32 @@ class LayerNormalization(nn.Module):
     def __init__(self, eps:float = 1e-6):
         super().__init__()
         self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(1))
+        self.bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x):
+        mean  = x.mean(dim = -1, keepdim=True)
+        std   = x.std(dim = -1, keepdim=True)
+        return self.alpha * (x - mean) / (std + self.eps) + self.bias
+    
+class FeedForwardBlock(nn.modules):
+
+    def __init__(self, d_model: int, d_ff: int, dropout: float) -> None:
+        super(FeedForwardBlock, self).__init__()
+        self.linear1 = nn.Linear(d_model, d_ff) # W1 and B1
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(d_ff, d_model) # W2 and B2
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # (Batch, Seq_len, d_model) -> (Batch, Seq_len, d_ff) -> (Batch, Seq_len, d_model)
+        return self.linear2(self.dropout(torch.relu(self.linear1(x))))
+    
+class MultiHeadAttentionBlock(nn.Module):
+
+    def __init__(self, d_model: int, h:int, dropout: float) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.h = h
+        assert d_model % h == 0, "d_model must be divisible by h"
+
+        self.d_k = d_model // h
